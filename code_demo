@@ -1,0 +1,103 @@
+#定义遗传算法类
+class gen_alg(object):
+    import random,copy
+    #传入参数
+    def __init__(self,dist_mat,start_point,end_point,init_time=100,
+                 pop_num=100,p_cros=0.5,p_vari=0.1,p_best=0.1):
+        self.dist_mat = dist_mat
+        self.start_point = start_point
+        self.end_point = end_point
+        self.init_time = init_time
+        self.pop_num = pop_num
+        self.p_cros = p_cros
+        self.p_vari = p_vari
+        self.p_best = p_best
+    #目标函数定义（以百度实际距离和为准）
+    def aim_func(self,order):
+        aim = 0
+        for i in range(len(order)-1):
+            aim += self.dist_mat[order[i],order[i+1]]
+            #print aim
+        return aim
+    #随机生成单个顺序
+    def rand_order(self):
+        start = self.start_point
+        end = self.end_point
+        org_order = range(self.dist_mat.shape[0])
+        org_order.remove(start)
+        org_order.remove(end)
+        random.shuffle(org_order)
+        new_order = [start] + org_order + [end]
+        return new_order
+    #随机生成的种群样本
+    def get_org_population(self,pop_num):
+        pop_init = []
+        for i in range(pop_num):
+            pop_init.append(self.rand_order())
+        return pop_init
+    #两个个体交叉函数
+    def cross_func(self,order1,order2):
+        order1 = copy.copy(order1)
+        order2 = copy.copy(order2)
+        order1.remove(self.start_point)
+        order1.remove(self.end_point)
+        order2.remove(self.start_point)
+        order2.remove(self.end_point)
+        num_cros = random.randint(1,(len(order1)-1))
+        sel_cros = random.sample(range(len(order1)),num_cros)
+        order1_cp,order2_cp = copy.copy(order1),copy.copy(order2)
+        for i in sel_cros:
+            order1_cp[i] = order2[i]
+            order1_cp[order1.index(order2[i])] = order1[i]
+            order2_cp[i] = order1[i]
+            order2_cp[order2.index(order1[i])] = order2[i]   
+            order1 = copy.copy(order1_cp)
+            order2 = copy.copy(order2_cp)
+        return [self.start_point]+order1_cp+[self.end_point],[self.start_point]+order2_cp+[self.end_point]
+    #变异函数   
+    def vari_func(self,order):
+        num_vari = random.randint(1,(len(order)/2))
+        sel_vari = random.sample(order[1:(len(order)-1)],num_vari)
+        order_cp = copy.copy(order)
+        for i in sel_vari:
+            value_tmp = random.sample(order[1:(len(order)-1)],1)[0]
+            order_cp[i] = value_tmp
+            order_cp[order.index(value_tmp)] = order[i]
+            order = copy.copy(order_cp)
+        return order_cp
+    #训练主函数
+    def gen_alg(self):
+        init_pop = self.get_org_population(self.pop_num)
+        for i in range(self.init_time):
+            aims_tmp = [self.aim_func(o) for o in init_pop]
+            index_aims = range(len(aims_tmp))
+            index_aims.sort(key=lambda i: aims_tmp[i])
+            #print "for the init %s, the best aim value is %s" % (i,aims_tmp[index_aims[0]])
+            
+            good_pop = [init_pop[j] for j in index_aims[:int(self.pop_num*self.p_cros)]]
+            best_pop = good_pop[:int(self.pop_num*self.p_best)]
+            #print best_pop[0]
+            
+            if i == self.init_time-1:
+                '''                
+                print "Finally the best aim value is %s" % aims_tmp[index_aims[0]]
+                print "And the best order is: "
+                print best_pop[0]
+                '''
+                return best_pop[0]
+            
+            random.shuffle(good_pop)
+            cros_pop = [0]*len(good_pop)
+            #print len(cros_pop)
+            for l in range(0,len(good_pop),2):
+                cros_tmp = self.cross_func(good_pop[l],good_pop[l+1])
+                cros_pop[l] = cros_tmp[0]
+                cros_pop[l+1] = cros_tmp[1]
+            
+            init_pop = init_pop+cros_pop+best_pop
+            vari_idx = random.sample(range(len(init_pop)),int(self.pop_num*self.p_vari))
+            for m in vari_idx:
+                 init_pop[m] = self.vari_func(init_pop[m])
+                 
+            init_pop = init_pop + self.get_org_population(self.pop_num-int(self.pop_num*self.p_cros)-int(self.pop_num*self.p_best))
+            
